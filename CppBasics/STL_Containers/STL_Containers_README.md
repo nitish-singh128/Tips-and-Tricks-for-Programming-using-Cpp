@@ -4,7 +4,7 @@
 
 The Standard Template Library (STL) is one of the most important aspects of C++ and is heavily tested in technical interviews. This comprehensive guide covers all STL containers, algorithms, iterators, and common interview problems with practical examples and performance analysis.
 
-##  Why STL is Critical for Interviews
+## Why STL is Critical for Interviews
 
 ### Technical Importance
 - **Ubiquitous Usage**: STL is used in virtually every C++ codebase
@@ -360,6 +360,126 @@ std::sort(vec.begin(), vec.end());  // Better than manual sort
 auto it = vec.cbegin(); // const_iterator when not modifying
 ```
 
+### Safety-First Programming Practices
+
+```cpp
+// Always validate container state before operations
+if (!vec.empty()) {
+    std::cout << vec.front() << std::endl;  // Safe front() access
+    std::cout << vec.back() << std::endl;   // Safe back() access
+}
+
+// Check size before index-based operations
+if (vec.size() > 2) {
+    vec.insert(vec.begin() + 2, 99);  // Safe insert with bounds check
+    vec.erase(vec.begin() + 2);       // Safe erase with bounds check
+}
+
+// Use at() for bounds-checked access during development/debugging
+try {
+    int value = vec.at(index);  // Throws std::out_of_range if invalid
+} catch (const std::out_of_range& e) {
+    std::cerr << "Index error: " << e.what() << std::endl;
+    // Handle error appropriately
+}
+
+// Validate find() results before using iterators
+auto it = std::find(vec.begin(), vec.end(), target);
+if (it != vec.end()) {  // ESSENTIAL check - always validate find results
+    std::cout << "Found: " << *it << " at position " << (it - vec.begin()) << std::endl;
+} else {
+    std::cout << "Element not found" << std::endl;
+}
+
+// Safe iterator operations with advance()
+auto iter = vec.begin();
+if (vec.size() >= 3) {  // Check before advancing
+    std::advance(iter, 2);  // Safe advance
+    std::cout << "Element at position 2: " << *iter << std::endl;
+}
+```
+
+### Educational Code Patterns
+
+```cpp
+// Visual demonstrations for learning
+std::queue<std::string> q;
+q.push("First");
+q.push("Second");
+
+// Show queue state without destroying original (educational pattern)
+std::queue<std::string> temp = q;  // Copy for visualization
+std::cout << "Queue contents (front to back): ";
+while (!temp.empty()) {
+    std::cout << temp.front() << " ";
+    temp.pop();
+}
+std::cout << std::endl;
+
+// Reusable, testable functions instead of inline code
+bool isValidParentheses(const std::string& expr) {
+    std::stack<char> stk;
+    for (char c : expr) {
+        if (c == '(' || c == '[' || c == '{') {
+            stk.push(c);
+        } else if (c == ')' || c == ']' || c == '}') {
+            if (stk.empty()) return false;
+            char top = stk.top();
+            stk.pop();
+            if ((c == ')' && top != '(') ||
+                (c == ']' && top != '[') ||
+                (c == '}' && top != '{')) {
+                return false;
+            }
+        }
+    }
+    return stk.empty();
+}
+
+// Test multiple cases to demonstrate robustness
+std::vector<std::string> test_cases = {"()", "()[]{}", "([{}])", "(()", ")("};
+for (const auto& test : test_cases) {
+    std::cout << "\"" << test << "\" is " 
+              << (isValidParentheses(test) ? "valid" : "invalid") << std::endl;
+}
+```
+
+### Container-Specific Safety Patterns
+
+```cpp
+// Stack safety
+std::stack<int> stk;
+while (!stk.empty()) {  // ALWAYS check empty() before top() or pop()
+    std::cout << stk.top() << " ";
+    stk.pop();
+}
+
+// Priority queue safety
+std::priority_queue<int> pq;
+while (!pq.empty()) {  // ALWAYS check empty() before top() or pop()
+    std::cout << pq.top() << " ";
+    pq.pop();
+}
+
+// Deque safety with both ends
+std::deque<int> dq = {1, 2, 3, 4, 5};
+if (!dq.empty()) {
+    dq.pop_front();  // Safe front removal
+}
+if (!dq.empty()) {
+    dq.pop_back();   // Safe back removal
+}
+
+// List safety with iterators
+std::list<int> lst = {1, 2, 3, 4, 5};
+if (lst.size() >= 2) {  // Check before advancing iterator
+    auto splice_pos = lst.begin();
+    std::advance(splice_pos, 2);
+    std::list<int> other = {99, 100};
+    lst.splice(splice_pos, other);  // Safe splice operation
+}
+```
+
 ### Memory Management
 
 ```cpp
@@ -410,11 +530,191 @@ struct PersonHash {
 std::unordered_set<Person, PersonHash> person_set;
 ```
 
+### Enhanced CircularBuffer Implementation
+Our implementation includes a production-ready CircularBuffer with comprehensive safety features:
+
+```cpp
+template<typename T>
+class CircularBuffer {
+public:
+    // Constructor with validation
+    explicit CircularBuffer(size_t size); // Throws if size == 0
+    
+    // Bounds-safe operations (throw on violation)
+    void push(const T& item);              // Throws std::overflow_error if full
+    T pop();                               // Throws std::underflow_error if empty
+    
+    // Peek operations (your request!) - non-modifying access
+    const T& front() const;                // View front element safely
+    T& front();                           
+    const T& back() const;                 // View back element safely  
+    T& back();
+    
+    // Bounds-checked element access
+    const T& at(size_t index) const;       // Throws std::out_of_range if invalid
+    T& at(size_t index);
+    
+    // Unchecked access (for performance when bounds are known)
+    const T& operator[](size_t index) const;
+    T& operator[](size_t index);
+    
+    // True circular behavior (overwrites oldest when full)
+    void push_overwrite(const T& item);    // Never throws, circular overwrite
+    void push_overwrite(T&& item);
+    
+    // Buffer management
+    void clear();                          // Reset to empty state
+    bool empty() const;                    // Check if empty
+    bool full() const;                     // Check if full
+    size_t size() const;                   // Current element count
+    size_t max_size() const;               // Buffer capacity
+    
+    // Enhanced iterator support with bounds checking
+    class iterator { /* bounds-safe implementation */ };
+    class const_iterator { /* const bounds-safe implementation */ };
+    
+    iterator begin();
+    iterator end();
+    const_iterator begin() const;
+    const_iterator end() const;
+    const_iterator cbegin() const;
+    const_iterator cend() const;
+};
+```
+
+#### CircularBuffer Usage Examples
+```cpp
+// Safe usage with exception handling
+try {
+    CircularBuffer<int> buffer(5);
+    
+    // Fill buffer safely
+    for (int i = 1; i <= 5; ++i) {
+        buffer.push(i);
+    }
+    
+    // Peek at elements without removing
+    std::cout << "Front: " << buffer.front() << std::endl;  // 1
+    std::cout << "Back: " << buffer.back() << std::endl;    // 5
+    
+    // Bounds-safe element access
+    for (size_t i = 0; i < buffer.size(); ++i) {
+        std::cout << buffer.at(i) << " ";  // Throws if out of range
+    }
+    
+    // Iterator support with range-based loops
+    for (const auto& elem : buffer) {
+        std::cout << elem << " ";
+    }
+    
+    // Circular overwrite behavior
+    buffer.push_overwrite(6);  // Overwrites oldest element
+    
+} catch (const std::overflow_error& e) {
+    std::cerr << "Buffer full: " << e.what() << std::endl;
+} catch (const std::underflow_error& e) {
+    std::cerr << "Buffer empty: " << e.what() << std::endl;
+} catch (const std::out_of_range& e) {
+    std::cerr << "Index error: " << e.what() << std::endl;
+}
+```
+
+#### CircularBuffer Features
+- **Bounds Checking**: All operations validate preconditions
+- **Exception Safety**: Meaningful error messages for all edge cases
+- **Peek Operations**: Non-modifying `front()` and `back()` access
+- **Dual Push Modes**: Safe `push()` vs circular `push_overwrite()`
+- **Iterator Support**: Full STL-compatible iterator interface
+- **Performance Options**: `at()` for safety, `operator[]` for speed
+- **Memory Efficient**: Pre-allocated buffer, no dynamic allocations during use
+
+### Educational Enhancements in STL Demonstrations
+
+Our STL demonstrations now include beginner-friendly features:
+
+#### Safety-First Approach
+```cpp
+// Always check bounds before operations
+if (!vec.empty()) {
+    std::cout << "Front: " << vec.front() << std::endl;  // Safe access
+}
+
+if (vec.size() > 2) {
+    vec.erase(vec.begin() + 2);  // Safe erase with size check
+}
+
+// Use at() for bounds-checked access in learning/debug scenarios
+try {
+    int value = vec.at(10);  // Throws if index >= size
+} catch (const std::out_of_range& e) {
+    std::cout << "Safe: " << e.what() << std::endl;
+}
+```
+
+#### Visual Learning Aids
+```cpp
+// Demonstrate uninitialized array contents (educational!)
+std::array<int, 5> arr2;  // Contains garbage values
+printContainer(arr2, "Before fill(42) - uninitialized");  // Shows garbage
+arr2.fill(42);
+printContainer(arr2, "After fill(42)");  // All elements = 42
+
+// Visual stack/queue state demonstrations
+std::stack<int> stk;
+// ... populate stack ...
+std::cout << "Stack contents (top to bottom): ";
+std::stack<int> temp = stk;  // Copy for non-destructive printing
+while (!temp.empty()) {
+    std::cout << temp.top() << " ";
+    temp.pop();
+}
+```
+
+#### Reusable Function Examples
+```cpp
+// Balanced parentheses checker - reusable and testable
+bool isBalanced(const std::string& expr) {
+    std::stack<char> stk;
+    for (char c : expr) {
+        if (c == '(') {
+            stk.push(c);
+        } else if (c == ')') {
+            if (stk.empty()) return false;
+            stk.pop();
+        }
+    }
+    return stk.empty();
+}
+
+// Usage with multiple test cases
+std::cout << "\"((()))\" is " << (isBalanced("((()))") ? "balanced" : "not balanced") << std::endl;
+std::cout << "\"((())\" is " << (isBalanced("((())") ? "balanced" : "not balanced") << std::endl;
+```
+
+#### Performance and Complexity Comments
+```cpp
+vec.push_back(6);        // O(1) amortized (sometimes O(n) when reallocation needed)
+vec.reserve(20);         // Pre-allocate capacity - O(n) one-time cost
+vec.insert(it, 99);      // Insert at position - O(n) due to shifting elements
+vec.shrink_to_fit();     // Release unused capacity - O(n) but saves memory
+lst.splice(it, other);   // Move elements from other list - O(1), just relink pointers!
+```
+
 ### Exception Safety
 STL containers provide different exception safety guarantees:
 - **Basic guarantee**: Container remains in valid state
-- **Strong guarantee**: Operation succeeds or has no effect
+- **Strong guarantee**: Operation succeeds or has no effect  
 - **No-throw guarantee**: Operation cannot throw
+
+Our enhanced implementations follow these principles:
+```cpp
+// CircularBuffer provides strong exception guarantee
+try {
+    buffer.push(item);  // Either succeeds completely or has no effect
+} catch (const std::overflow_error&) {
+    // Buffer state unchanged, can continue safely
+}
+```
 
 ## Testing and Debugging
 
@@ -474,5 +774,6 @@ const std::vector<int>& const_ref = vec;
 - [ ] Template metaprogramming with STL
 - [ ] Parallel algorithms (C++17)
 - [ ] Ranges library (C++20)
+---
 
-**Master the STL and you master a huge part of effective C++ programming!** 
+Master the STL and you master a huge part of effective C++ programming! 
